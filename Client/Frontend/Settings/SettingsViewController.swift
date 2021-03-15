@@ -256,6 +256,12 @@ class SettingsViewController: TableViewController {
             }, cellClass: MultilineButtonCell.self))
         }
         
+        general.rows.append(
+            .boolRow(title: Strings.alwaysRequestDesktopSite,
+                     option: Preferences.General.alwaysRequestDesktopSite,
+                     image: #imageLiteral(resourceName: "settings-desktop-always").template)
+        )
+        
         return general
     }()
     
