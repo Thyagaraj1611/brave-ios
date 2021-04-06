@@ -5,7 +5,7 @@
 import UIKit
 import BraveShared
 
-class TabBarCell: UICollectionViewCell {
+class TabBarCell: UICollectionViewCell, Themeable {
     
     lazy var titleLabel: UILabel = {
         let label = UILabel()
@@ -25,15 +25,11 @@ class TabBarCell: UICollectionViewCell {
     
     private lazy var separatorLine: UIView = {
         let view = UIView()
-        let theme = Theme.of(nil)
-        view.backgroundColor = theme.colors.border.withAlphaComponent(theme.colors.transparencies.borderAlpha)
         return view
     }()
     
     lazy var separatorLineRight: UIView = {
         let view = UIView()
-        let theme = Theme.of(nil)
-        view.backgroundColor = theme.colors.border.withAlphaComponent(theme.colors.transparencies.borderAlpha)
         view.isHidden = true
         return view
     }()
@@ -60,6 +56,25 @@ class TabBarCell: UICollectionViewCell {
     
     required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+    
+    private var selectedBackgroundColor: UIColor?
+    private var normalBackgroundColor: UIColor?
+    
+    func applyTheme(_ theme: Theme) {
+        separatorLine.backgroundColor = theme.colors.border.withAlphaComponent(theme.colors.transparencies.borderAlpha)
+        separatorLineRight.backgroundColor = theme.colors.border.withAlphaComponent(theme.colors.transparencies.borderAlpha)
+        closeButton.tintColor = theme.colors.tints.header
+        titleLabel.textColor = theme.colors.tints.header
+        
+        selectedBackgroundColor = theme.colors.header
+        normalBackgroundColor = theme.colors.home
+        
+        if isSelected {
+            backgroundColor = selectedBackgroundColor
+        } else if currentIndex != tabManager?.currentDisplayedIndex {
+            backgroundColor = normalBackgroundColor
+        }
     }
     
     private func initConstraints() {
@@ -92,21 +107,18 @@ class TabBarCell: UICollectionViewCell {
     
     override var isSelected: Bool {
         didSet {
-            let theme = Theme.of(tab)
-            closeButton.tintColor = theme.colors.tints.header
-            
             if isSelected {
                 titleLabel.font = UIFont.systemFont(ofSize: 12, weight: UIFont.Weight.semibold)
                 closeButton.isHidden = false
-                titleLabel.textColor = theme.colors.tints.header
-                backgroundColor = theme.colors.header
+                titleLabel.alpha = 1.0
+                backgroundColor = selectedBackgroundColor
             }
                 // Prevent swipe and release outside- deselects cell.
             else if currentIndex != tabManager?.currentDisplayedIndex {
                 titleLabel.font = UIFont.systemFont(ofSize: 12)
-                titleLabel.textColor = theme.colors.tints.header.withAlphaComponent(0.6)
+                titleLabel.alpha = 0.6
                 closeButton.isHidden = true
-                backgroundColor = theme.colors.home
+                backgroundColor = normalBackgroundColor
             }
         }
     }

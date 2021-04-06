@@ -62,6 +62,8 @@ class TabsBarViewController: UIViewController {
         fatalError("init(coder:) has not been implemented")
     }
     
+    private var currentTheme: Theme?
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -134,14 +136,6 @@ class TabsBarViewController: UIViewController {
     
     @objc func orientationChanged() {
         overflowIndicators()
-    }
-    
-    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
-        super.traitCollectionDidChange(previousTraitCollection)
-        
-        if traitCollection.userInterfaceStyle != previousTraitCollection?.userInterfaceStyle {
-            applyTheme(Theme.of(nil))
-        }
     }
     
     @objc func addTabPressed() {
@@ -315,7 +309,7 @@ extension TabsBarViewController: UICollectionViewDataSource {
         cell.titleLabel.text = tab.displayTitle
         cell.currentIndex = indexPath.row
         cell.separatorLineRight.isHidden = (indexPath.row != tabList.count() - 1)
-        
+        cell.applyTheme(currentTheme ?? Theme.of(tab))
         cell.closeTabCallback = { [weak self] tab in
             guard let strongSelf = self, let tabManager = strongSelf.tabManager, let previousIndex = strongSelf.tabList.index(of: tab) else { return }
             
@@ -372,6 +366,7 @@ extension TabsBarViewController: TabManagerDelegate {
 extension TabsBarViewController: Themeable {
     func applyTheme(_ theme: Theme) {
         styleChildren(theme: theme)
+        currentTheme = theme
         
         view.backgroundColor = theme.colors.header
         plusButton.tintColor = theme.colors.tints.header
