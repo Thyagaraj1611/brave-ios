@@ -22,9 +22,7 @@ import BraveUI
 import NetworkExtension
 import YubiKit
 import FeedKit
-#if canImport(SwiftUI)
 import SwiftUI
-#endif
 
 private let log = Logger.browserLogger
 
@@ -2488,9 +2486,9 @@ extension BrowserViewController: ToolbarDelegate {
         }
     }
     
-    func featuresMenuSection(_ menuController: NewMenuController) -> some View {
+    func featuresMenuSection(_ menuController: MenuViewController) -> some View {
         VStack(spacing: 0) {
-            VPNMenuButton(icon: #imageLiteral(resourceName: "vpn_menu_icon").template, title: "Brave VPN", vpnProductInfo: self.vpnProductInfo) { vc in
+            VPNMenuButton(vpnProductInfo: self.vpnProductInfo) { vc in
                 self.dismiss(animated: true) {
                     self.present(vc, animated: true)
                 }
@@ -2498,7 +2496,7 @@ extension BrowserViewController: ToolbarDelegate {
         }
     }
     
-    func destinationMenuSection(_ menuController: NewMenuController) -> some View {
+    func destinationMenuSection(_ menuController: MenuViewController) -> some View {
         VStack(spacing: 0) {
             MenuItemButton(icon: #imageLiteral(resourceName: "menu_bookmarks").template, title: Strings.bookmarksMenuItem) {
                 let vc = BookmarksViewController(folder: Bookmarkv2.lastVisitedFolder(), isPrivateBrowsing: PrivateBrowsingManager.shared.isPrivateBrowsing)
@@ -2512,6 +2510,7 @@ extension BrowserViewController: ToolbarDelegate {
             }
             MenuItemButton(icon: #imageLiteral(resourceName: "menu-downloads").template, title: Strings.downloadsMenuItem) {
                 let vc = DownloadsPanel(profile: self.profile)
+                vc.applyTheme(Theme.of(nil))
                 menuController.pushViewController(vc, animated: true)
             }
             MenuItemButton(icon: #imageLiteral(resourceName: "menu-settings").template, title: Strings.settingsMenuItem) {
@@ -2546,7 +2545,7 @@ extension BrowserViewController: ToolbarDelegate {
         }
     }
     
-    func activitiesMenuSection(_ menuController: NewMenuController, tabURL: URL, activities: [UIActivity]) -> some View {
+    func activitiesMenuSection(_ menuController: MenuViewController, tabURL: URL, activities: [UIActivity]) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             MenuTabDetailsView(tab: tabManager.selectedTab, url: tabURL)
             VStack(spacing: 0) {
@@ -2579,7 +2578,7 @@ extension BrowserViewController: ToolbarDelegate {
         if let url = selectedTabURL, let tab = tabManager.selectedTab {
             activities = shareActivities(for: url, tab: tab, sourceView: view, sourceRect: self.view.convert(self.topToolbar.menuButton.frame, from: self.topToolbar.menuButton.superview), arrowDirection: .up)
         }
-        let menuController = NewMenuController(content: { menuController in
+        let menuController = MenuViewController(content: { menuController in
             VStack(spacing: 6) {
                 featuresMenuSection(menuController)
                 Divider()
