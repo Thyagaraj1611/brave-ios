@@ -22,6 +22,9 @@ import BraveUI
 import NetworkExtension
 import YubiKit
 import FeedKit
+#if canImport(SwiftUI)
+import SwiftUI
+#endif
 
 private let log = Logger.browserLogger
 
@@ -1743,10 +1746,8 @@ class BrowserViewController: UIViewController {
             topToolbar.didClickCancel()
         }
     }
-
-    fileprivate func presentActivityViewController(_ url: URL, tab: Tab? = nil, sourceView: UIView?, sourceRect: CGRect, arrowDirection: UIPopoverArrowDirection) {
-        let helper = ShareExtensionHelper(url: url, tab: tab)
-        
+    
+    fileprivate func shareActivities(for url: URL, tab: Tab?, sourceView: UIView?, sourceRect: CGRect, arrowDirection: UIPopoverArrowDirection) -> [UIActivity] {
         let findInPageActivity = FindInPageActivity() { [unowned self] in
             self.updateFindInPageVisibility(visible: true)
         }
@@ -1812,7 +1813,6 @@ class BrowserViewController: UIViewController {
                 }
             }
             
-            #if compiler(>=5.3)
             if #available(iOS 14.0, *), let webView = tab?.webView, tab?.temporaryDocument == nil {
                 let createPDFActivity = CreatePDFActivity(webView: webView) { [weak self] pdfData in
                     guard let self = self else { return }
@@ -1840,7 +1840,6 @@ class BrowserViewController: UIViewController {
                 }
                 activities.append(createPDFActivity)
             }
-            #endif
         } else {
             // Check if its a feed, url is a temp document file URL
             if let selectedTab = tabManager.selectedTab,
@@ -1882,6 +1881,20 @@ class BrowserViewController: UIViewController {
         if let playListActivityItem = addToPlayListActivityItem, playListActivityItem.enabled {
             activities.append(addToPlayListActivity)
         }
+      
+        return activities
+    }
+
+    fileprivate func presentActivityViewController(_ url: URL, tab: Tab? = nil, sourceView: UIView?, sourceRect: CGRect, arrowDirection: UIPopoverArrowDirection) {
+        let helper = ShareExtensionHelper(url: url, tab: tab)
+        
+        let activities: [UIActivity] = shareActivities(
+            for: url,
+            tab: tab,
+            sourceView: sourceView,
+            sourceRect: sourceRect,
+            arrowDirection: arrowDirection
+        )
         
         let controller = helper.createActivityViewController(items: activities) { [weak self] completed, _, documentUrl  in
             guard let self = self else { return }
@@ -2475,12 +2488,116 @@ extension BrowserViewController: ToolbarDelegate {
         }
     }
     
+    @available(iOS 13.0, *)
+    func featuresMenuSection(_ menuController: NewMenuController) -> some View {
+        VStack(spacing: 0) {
+            VPNMenuButton(icon: #imageLiteral(resourceName: "vpn_menu_icon").template, title: "Brave VPN", vpnProductInfo: self.vpnProductInfo) { vc in
+                self.dismiss(animated: true) {
+                    self.present(vc, animated: true)
+                }
+            }
+        }
+    }
+    
+    @available(iOS 13.0, *)
+    func destinationMenuSection(_ menuController: NewMenuController) -> some View {
+        VStack(spacing: 0) {
+            MenuItemButton(icon: #imageLiteral(resourceName: "menu_bookmarks").template, title: Strings.bookmarksMenuItem) {
+                let vc = BookmarksViewController(folder: Bookmarkv2.lastVisitedFolder(), isPrivateBrowsing: PrivateBrowsingManager.shared.isPrivateBrowsing)
+                vc.toolbarUrlActionsDelegate = self
+                menuController.presentInnerMenu(vc)
+            }
+            MenuItemButton(icon: #imageLiteral(resourceName: "menu-history").template, title: Strings.historyMenuItem) {
+                let vc = HistoryViewController(isPrivateBrowsing: PrivateBrowsingManager.shared.isPrivateBrowsing)
+                vc.toolbarUrlActionsDelegate = self
+                menuController.pushViewController(vc, animated: true)
+            }
+            MenuItemButton(icon: #imageLiteral(resourceName: "menu-downloads").template, title: Strings.downloadsMenuItem) {
+                let vc = DownloadsPanel(profile: self.profile)
+                menuController.pushViewController(vc, animated: true)
+            }
+        }
+    }
+    
+    @available(iOS 13.0, *)
+    struct MenuTabDetailsView: View {
+        @SwiftUI.Environment(\.colorScheme) var colorScheme: ColorScheme
+        var tab: Tab?
+        var url: URL
+        
+        var body: some View {
+            VStack(alignment: .leading, spacing: 2) {
+                if let tab = tab {
+                    Text(verbatim: tab.displayTitle)
+                        .font(.callout)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+                        .foregroundColor(Color(Theme.of(nil).colors.tints.home))
+                }
+                Text(verbatim: url.baseDomain ?? url.absoluteDisplayString)
+                    .font(.footnote)
+                    .lineLimit(1)
+                    .foregroundColor(Color(Theme.of(nil).colors.tints.home).opacity(0.8))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+        }
+    }
+    
+    @available(iOS 13.0, *)
+    func activitiesMenuSection(_ menuController: NewMenuController, tabURL: URL, activities: [UIActivity]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            MenuTabDetailsView(tab: tabManager.selectedTab, url: tabURL)
+            VStack(spacing: 0) {
+                MenuItemButton(icon: #imageLiteral(resourceName: "menu-add-bookmark").template, title: Strings.addToMenuItem) {
+                    self.dismiss(animated: true) {
+                        self.openAddBookmark()
+                    }
+                }
+                ForEach(activities, id: \.activityTitle) { activity in
+                    MenuItemButton(icon: activity.activityImage?.template ?? UIImage(), title: activity.activityTitle ?? "") {
+                        self.dismiss(animated: true) {
+                            activity.perform()
+                        }
+                    }
+                }
+                MenuItemButton(icon: #imageLiteral(resourceName: "nav-share").template, title: Strings.shareWithMenuItem) {
+                    self.dismiss(animated: true)
+                    self.tabToolbarDidPressShare()
+                }
+            }
+        }
+    }
+    
     func tabToolbarDidPressMenu(_ tabToolbar: ToolbarProtocol) {
-        let homePanel = MenuViewController(bvc: self, tab: tabManager.selectedTab)
-        let popover = PopoverController(contentController: homePanel, contentSizeBehavior: .preferredContentSize)
-        // Not dynamic, but trivial at this point, given how UI is currently setup
-        popover.color = Theme.of(tabManager.selectedTab).colors.home
-        popover.present(from: tabToolbar.menuButton, on: self)
+        if #available(iOS 13.0, *) {
+            let selectedTabURL: URL? = {
+                guard let url = tabManager.selectedTab?.url, !url.isLocal || url.isReaderModeURL else { return nil }
+                return url
+            }()
+            var activities: [UIActivity] = []
+            if let url = selectedTabURL, let tab = tabManager.selectedTab {
+                activities = shareActivities(for: url, tab: tab, sourceView: view, sourceRect: self.view.convert(self.topToolbar.menuButton.frame, from: self.topToolbar.menuButton.superview), arrowDirection: .up)
+            }
+            let menuController = NewMenuController(content: { menuController in
+                VStack(spacing: 6) {
+                    featuresMenuSection(menuController)
+                    Divider()
+                    destinationMenuSection(menuController)
+                    if let tabURL = selectedTabURL {
+                        Divider()
+                        activitiesMenuSection(menuController, tabURL: tabURL, activities: activities)
+                    }
+                    Divider()
+                    MenuItemButton(icon: #imageLiteral(resourceName: "menu-settings").template, title: Strings.settingsMenuItem) {
+                        let vc = SettingsViewController(profile: self.profile, tabManager: self.tabManager, feedDataSource: self.feedDataSource, rewards: self.rewards, legacyWallet: self.legacyWallet)
+                        vc.settingsDelegate = self
+                        menuController.pushViewController(vc, animated: true)
+                    }
+                }
+            })
+            presentPanModal(menuController, sourceView: tabToolbar.menuButton, sourceRect: tabToolbar.menuButton.bounds)
+        }
     }
     
     func tabToolbarDidPressAddTab(_ tabToolbar: ToolbarProtocol, button: UIButton) {
