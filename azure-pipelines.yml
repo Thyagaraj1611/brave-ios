@@ -7,7 +7,7 @@ trigger:
 - development
 
 pool:
-  vmImage: macos-latest
+  vmImage: 'macos-latest'
 
 steps:
 - script: echo Hello, world!
